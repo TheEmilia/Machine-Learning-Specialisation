@@ -41,6 +41,37 @@ def mean_squared_error(predictions, y):
     return mse
 
 
+def compute_gradient(X, y, weights, bias):
+    """
+    Computes the gradient for logistic regression
+
+    Args:
+      X (ndarray (m,n): Data, m examples with n features
+      y (ndarray (m,)): target values
+      w (ndarray (n,)): model parameters
+      b (scalar)      : model parameter
+    Returns
+      dj_dw (ndarray (n,)): The gradient of the cost w.r.t. the parameters w.
+      dj_db (scalar)      : The gradient of the cost w.r.t. the parameter b.
+    """
+
+    dj_dw = np.zeros(weights.shape)
+    dj_db = 0.0
+    predictions = model(X, weights, bias)
+    error = predictions - y
+
+    for i in range(len(y)):
+        for j in range(len(weights)):
+            dj_dw[j] += error[i] * X[i, j]  # scalar
+        dj_db += error[i]
+
+    dj_dw /= len(y)  # (n,)
+    dj_db /= len(y)  # scalar
+
+    return dj_db, dj_dw
+
+
+# TODO rename this to be consistent with logistic regression
 def update_model_parameters(X, weights, bias, predictions, y, learning_rate):
     """
     Calculates new values of the model parameters using gradient descent by way of the derivative of the cost function
