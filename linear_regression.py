@@ -21,9 +21,9 @@ def model(X, weights, bias):
     return predictions
 
 
-def mean_squared_error(predictions, y):
+def compute_cost_regularized(X, y, weights, bias, lambda_=1.0):
     """
-    Calculates the MSE of the given parameters using the cost function
+    Computes the cost (Regularized MSE) over all examples
 
     Args:
       predictions (ndarray): Shape (m,) array of predictions for y
@@ -32,27 +32,38 @@ def mean_squared_error(predictions, y):
     Returns:
       mse (scalar): mean squared error of the model with the given parameters
     """
+    cost = 0.0
+    predictions = model(X, y, weights, bias)
 
-    mse = 0
     for i in range(len(y)):
-        mse += (predictions[i] - y[i]) ** 2
+        cost += (predictions[i] - y[i]) ** 2
 
-    mse /= len(y)
-    return mse
+    cost /= len(y)
+    lambda_ /= 2 * len(y)
+
+    reg_cost = 0
+    for j in range(len(weights)):
+        reg_cost += weights[j] ** 2  # scalar
+
+    reg_cost *= lambda_  # scalar
+
+    total_cost = cost + reg_cost  # scalar
+    return total_cost
 
 
-def compute_gradient(X, y, weights, bias):
+def compute_gradient_regularized(X, y, weights, bias, lambda_=1):
     """
     Computes the gradient for logistic regression
 
     Args:
       X (ndarray (m,n): Data, m examples with n features
       y (ndarray (m,)): target values
-      w (ndarray (n,)): model parameters
-      b (scalar)      : model parameter
+      weights (ndarray (n,)): model parameters
+      bias (scalar): model parameter
+      lambda_ (scalar): Controls amount of regularization
     Returns
       dj_dw (ndarray (n,)): The gradient of the cost w.r.t. the parameters w.
-      dj_db (scalar)      : The gradient of the cost w.r.t. the parameter b.
+      dj_db (scalar): The gradient of the cost w.r.t. the parameter b.
     """
 
     dj_dw = np.zeros(weights.shape)
@@ -62,77 +73,51 @@ def compute_gradient(X, y, weights, bias):
 
     for i in range(len(y)):
         for j in range(len(weights)):
-            dj_dw[j] += error[i] * X[i, j]  # scalar
+            dj_dw[j] += error[i] * X[j][i]  # scalar
         dj_db += error[i]
 
     dj_dw /= len(y)  # (n,)
     dj_db /= len(y)  # scalar
+    lambda_ /= len(y)
+
+    # Regularizes weights
+    for j in range(len(weights)):
+        dj_dw[j] += lambda_ * weights[j]
 
     return dj_db, dj_dw
 
 
-# TODO rename this to be consistent with logistic regression
-def update_model_parameters(X, weights, bias, predictions, y, learning_rate):
+def gradient_descent(
+    X, predictions, y, weights, bias=0.0, iterations=1, learning_rate=0.001, lambda_=1.0
+):
     """
-    Calculates new values of the model parameters using gradient descent by way of the derivative of the cost function
+    Performs batch gradient descent
 
     Args:
-      X (ndarray): Shape (n,m) array of m input vectors with n features
-      weights (ndarray): Shape (n,) model parameters
-      bias (scalar):  model parameter
-      predictions (ndarray): Shape (m,) array of predictions for y
-      y (ndarray): Shape (m,) true values of y
-      learning_rate (scalar): the magnitude by which to modify the model parameters
+      X (ndarray (n,m)): Data, m examples with n features
+      y (ndarray (m,)): Target values
+      weights (ndarray (n,)): Initial values of model parameters
+      bias (scalar):  Initial values of model parameter
+      iterations (scalar): number of times to perform gradient descent
+      learning_rate (scalar): Learning rate
+      lambda_ (scalar): Controls amount of regularization
 
     Returns:
-      weights (ndarray): Shape (n,) updated model parameters
-      bias (scalar): updated model parameter
+      weights (ndarray (n,)): Updated values of model parameters
+      bias (scalar): Updated value of model parameter
     """
+    for i in range(iterations):
+        # Calculate the gradient and update the parameters
+        dj_db, dj_dw = compute_gradient_regularized(X, y, weights, bias, lambda_)
 
-    dj_dw = np.zeros(weights.shape)
-    dj_db = 0.0
+        # Update Parameters using w, b, learning_rate and gradient
+        weights -= learning_rate * dj_dw
+        bias -= learning_rate * dj_db
 
-    for i in range(len(y)):
-        error = predictions[i] - y[i]
-        for j in range(len(weights)):
-            # sum the values of the partial derivative with respect to w of the cost function with each prediction's error substituted in
-            dj_dw[j] += error * X[j][i]
-
-        dj_db += predictions[i] - y[i]
-
-    dj_dw /= len(y)
-    weights = weights - learning_rate * dj_dw
-    print(weights, dj_dw)
-
-    dj_db /= len(y)
-    bias = bias - learning_rate * dj_db
-    return weights, bias
-
-
-def train_model(X, predictions, y, weights, bias=0.0, epochs=1, learning_rate=0.001):
-    """
-    Calculates new values of the model parameters using gradient descent by way of the derivative of the cost function
-
-    Args:
-      X (ndarray): Shape (n,m) array of m input vectors with n features
-      predictions (ndarray): Shape (m,) array of predictions for y
-      y (ndarray): Shape (m,) true values of y
-      weights (ndarray): Shape (n,) model parameters
-      bias (scalar):  model parameter
-      learning_rate (scalar): the magnitude by which to modify the model parameters
-      epochs (scalar): number of times to update the model parameters
-
-    Returns:
-      weights (ndarray): Shape (n,) final model parameters
-      bias (scalar): final model parameter
-    """
-    for i in range(epochs):
-        weights, bias = update_model_parameters(
-            X, weights, bias, predictions, y, learning_rate
-        )
-        predictions = model(X, weights, bias)
-        mse = mean_squared_error(predictions, y)
-
-        print(f"Epoch {i}: weights = {weights}, bias = {bias}, MSE = {mse}")
+        # Print cost every at intervals 10 times or as many iterations if < 10
+        if i % np.ceil(iterations / 10) == 0:
+            print(
+                f"Iteration {i}: Cost {compute_cost_regularized(X, y, weights, bias, lambda_)}"
+            )
 
     return weights, bias
